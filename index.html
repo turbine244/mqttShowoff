@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>MQTT 송수신 테스트</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 30px auto; }
+    fieldset { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+    legend { font-weight: bold; }
+    input[type="text"] { width: 100%; padding: 8px; font-size: 16px; margin-top: 4px; margin-bottom: 10px; }
+    button { padding: 8px 16px; font-size: 16px; cursor: pointer; }
+    #log { border: 1px solid #ccc; background: #fafafa; padding: 10px; height: 250px; overflow-y: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>MQTT 메시지 송수신 테스트</h2>
+
+  <fieldset>
+    <legend>📤 Publish</legend>
+    <label>토픽:</label>
+    <input id="pubTopic" type="text" value="test/topic" placeholder="보낼 토픽 입력">
+    <label>메시지:</label>
+    <input id="msg" type="text" placeholder="보낼 메시지 입력">
+    <button id="sendBtn">보내기</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>📥 Subscribe</legend>
+    <label>구독할 토픽:</label>
+    <input id="subTopic" type="text" value="test/topic" placeholder="구독할 토픽 입력">
+    <button id="subBtn">구독 시작</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>📜 수신 로그</legend>
+    <div id="log"></div>
+  </fieldset>
+
+  <script>
+    // 브로커 주소 (WebSocket 전용 포트)
+    const BROKER_URL = "ws://165.246.44.72:1999";
+
+    const logBox = document.getElementById("log");
+    function log(msg) {
+      logBox.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    log(`브로커 연결 중... (${BROKER_URL})`);
+    const client = mqtt.connect(BROKER_URL);
+
+    client.on("connect", () => {
+      log("✅ 연결 성공");
+      document.getElementById("sendBtn").disabled = false;
+      document.getElementById("subBtn").disabled = false;
+    });
+
+    client.on("error", (err) => {
+      log("❌ 연결 오류: " + err.message);
+    });
+
+    // ------------------ Publish ------------------
+    document.getElementById("sendBtn").addEventListener("click", () => {
+      const topic = document.getElementById("pubTopic").value.trim();
+      const msg = document.getElementById("msg").value.trim();
+      if (!topic || !msg) {
+        log("⚠️ 토픽과 메시지를 모두 입력하세요.");
+        return;
+      }
+      client.publish(topic, msg, { qos: 0 }, (err) => {
+        if (err) log("전송 실패: " + err.message);
+        else log(`📤 보냄 → [${topic}] ${msg}`);
+      });
+      document.getElementById("msg").value = "";
+    });
+
+    // ------------------ Subscribe ------------------
+    document.getElementById("subBtn").addEventListener("click", () => {
+      const topic = document.getElementById("subTopic").value.trim();
+      if (!topic) {
+        log("⚠️ 구독할 토픽을 입력하세요.");
+        return;
+      }
+      client.subscribe(topic, { qos: 0 }, (err) => {
+        if (err) log("구독 실패: " + err.message);
+        else log(`📥 구독 시작: [${topic}]`);
+      });
+    });
+
+    // ------------------ Message Listener ------------------
+    client.on("message", (topic, message) => {
+      const payload = new TextDecoder("utf-8").decode(message);
+      log(`📩 수신 → [${topic}] ${payload}`);
+    });
+  </script>
+</body>
+</html>
